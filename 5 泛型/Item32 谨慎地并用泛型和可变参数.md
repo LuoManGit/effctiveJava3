@@ -41,6 +41,108 @@ static void dangerous(List<String>... stringLists) {
 
 > Prior to Java 7, there was nothing the author of a method with a generic varargs parameter could do about the warnings at the call sites. This made these APIs unpleasant to use. Users had to put up with the warnings or, preferably, to eliminate them with @SuppressWarnings("unchecked") annotations at every call site (Item 27). This was tedious, harmed readability, and hid warnings that flagged real issues.
 
+在Java7之前的版本中，泛型可变参数方法的设计者，对于每次调用方法都要生成的警告毫无办法。这使得这个API用起来很不舒服。用户必须要忍受这些警告，或者，在每次调用的时候都使用@SuppressWarnings("unchecked") 注解，后面这个方法要稍微好些。这么做都非常单调，并且会影响可读性，还会掩盖一些实际问题生成的警告。
+
+> In Java 7, the SafeVarargs annotation was added to the platform, to allow the author of a method with a generic varargs parameter to suppress client warnings automatically. In essence, **the** **SafeVarargs** **annotation constitutes a promise by the author of a method that it is typesafe.** In exchange for this promise, the compiler agrees not to warn the users of the method that calls may be unsafe.
+
+在Java7中，SafeVarargs注解被添加到了平台里，这个注解可以允许泛型可变参数方法的作者自动地禁止客户端的警告。本质上，**SafeVarargs注解就代表着这个方法的作者的承诺，保证这个方法是类型安全的**。有了这个承诺，编译器就可以不用再警告 这个方法的用户 这个调用可能是不安全的了。
+
+> It is critical that you do not annotate a method with @SafeVarargs unless it actually *is* safe. So what does it take to ensure this? Recall that a generic array is created when the method is invoked, to hold the varargs parameters. If the method doesn’t store anything into the array (which would overwrite the parameters) and doesn’t allow a reference to the array to escape (which would enable untrusted code to access the array), then it’s safe. In other words, if the varargs parameter array is used only to transmit a variable number of arguments from the caller to the method—which is, after all, the purpose of varargs—then the method is safe.
+
+只有当方法是真正类型安全的时候，才使用@SafeVarargs注解，这是非常重要的。那么什么情况能保证类型安全呢？回顾一下，方法被调用的时候，会创建一个泛型数组来持有可变参数。如果这个方法不往这个数组里存放任何的东西（这可能会覆盖掉参数），也不让这个数组的引用泄露（*赋值给其他变量，作为方法的返回值*）（这可能会允许一些不可信的代码访问到这个数组），就可以保证其类型安全。换句话说，如果这个可变参数数组只用来从调用者那里传递可变数量的参数给方法（当然，这也是可变参数真正的目的），那么这个方法就是安全的。
+
+> It is worth noting that you can violate type safety without ever storing anything in the varargs parameter array. Consider the following generic varargs method, which returns an array containing its parameters. At first glance, it may look like a handy little utility:
+
+需要注意的是，即使不往可变参数数组里存放任何东西，也可能会破坏类型安全。比如下面这个泛型可变参数方法，返回了包含其可变参数的数组。乍一看，还好像是一个方便的小工具。代码如下：
+
+```java
+// UNSAFE - Exposes a reference to its generic parameter array!
+   static <T> T[] toArray(T... args) {
+       return args;
+}
+```
+
+> This method simply returns its varargs parameter array. The method may not look dangerous, but it is! The type of this array is determined by the compile-time types of the arguments passed in to the method, and the compiler may not have enough information to make an accurate determination. Because this method returns its varargs parameter array, it can propagate heap pollution up the call stack.
+
+这个方法只是简单地返回了其可变参数数组。这个方法看起来好像没什么危害，但是它确实很危险。数组的类型，是由编译时传递给这个方法的参数的类型决定的，并且编译器并没有足够的信息来做出正确的决定。由于这个方法直接放回了其可变参数数组，它可以将对污染传播到其调用栈里。
+
+> To make this concrete, consider the following generic method, which takes three arguments of type T and returns an array containing two of the arguments, chosen at random:
+
+为了说得更清楚一些，看看下面这个泛型的方法，有三个类型为T的参数，返回一个包含其中随机两个参数的数组。代码如下：
+
+```java
+static <T> T[] pickTwo(T a, T b, T c) {
+       switch(ThreadLocalRandom.current().nextInt(3)) {
+         case 0: return toArray(a, b);
+         case 1: return toArray(a, c);
+         case 2: return toArray(b, c);
+			}
+       throw new AssertionError(); // Can't get here
+   }
+```
+
+> This method is not, in and of itself, dangerous and would not generate a warning except that it invokes the toArray method, which has a generic varargs parameter.
+
+这个方法本身并没有很危险，也不会生成任何的warning，除非它调用了有泛型可变参数的toArray方法。（*可它不就是调用了嘛*）。
+
+> When compiling this method, the compiler generates code to create a varargs parameter array in which to pass two T instances to toArray. This code allocates an array of type Object[], which is the most specific type that is guaranteed to hold these instances, no matter what types of objects are passed to pickTwo at the call site. The toArray method simply returns this array to pickTwo, which in turn returns it to its caller, so pickTwo will always return an array of type Object[].
+
+当编译这个方法的时候，编译器在给toArray方法传递两个T实例的时候，会生成创建可变参数数组的代码。这个代码会创建一个Object[]类型的数组，不管在调用时，传递给pickTwo方法这些对象类型是什么，Object[]是能保证持有所有实例的最具体的类型了。这个toArray方法也只是简单地将这个数组返回给pickTwo方法，而pickTwo方法也直接将数组返回给了其调用程序，因此pickTwo方法也总是返回类型为Object[]的数组。
+
+> Now consider this main method, which exercises pickTwo:
+
+现在来看看这个使用了pickTwo方法的main方法，如下：
+
+```java
+public static void main(String[] args) {
+       String[] attributes = pickTwo("Good", "Fast", "Cheap");
+}
+```
+
+> There is nothing at all wrong with this method, so it compiles without generating any warnings. But when you run it, it throws a ClassCastException, though it contains no visible casts. What you don’t see is that the compiler has generated a hidden cast to String[] on the value returned by pickTwo so that it can be stored in attributes. The cast fails, because Object[] is not a subtype of String[]. This failure is quite disconcerting because it is two levels removed from the method that actually causes the heap pollution (toArray), and the varargs parameter array is not modified after the actual parameters are stored in it.
+
+这个方法没什么错，所有在编译的时候，不会生成任何的警告。但是当你执行它的时候，会抛出ClassCastException，即使代码中不包含可见的转换。我们看不见的转换，是编译器为了将pickTwo的返回值存在attributes里时，生成的将返回值转换为String[]的隐藏转换。这个转换失败了，因为Object[]不是String[]的子类型。这个失败很难被发现，因为距离真正造成堆泄露的地方（toArray），已经隔了好几层调用，而且这个可变参数数组，自真正参数保存在里面以后，确实没有修改过。
+
+> This example is meant to drive home the point that **it is unsafe to give another method access to a generic varargs parameter array,** with two exceptions: it is safe to pass the array to another varargs method that is correctly annotated with @SafeVarargs, and it is safe to pass the array to a non-varargs method that merely computes some function of the contents of the array.
+
+这个例子是为了告诉大家**允许另一个方法访问一个泛型可变参数数组是不安全的**。但又两点意外：把这个数组传递给另一个正确使用@SafeVarargs进行注释的方法是安全的，把这个数组传递给一个只是基于数组的内容做一些计算的非可变参数方法，也是安全的。
+
+> Here is a typical example of a safe use of a generic varargs parameter. This method takes an arbitrary number of lists as arguments and returns a single list containing the elements of all of the input lists in sequence. Because the method is annotated with @SafeVarargs, it doesn’t generate any warnings, on the declaration or at its call sites:
+
+下面是一个安全使用泛型可变参数的一个典型的例子，这个方法的参数是任意多个列表，返回一个包含输入列表中所有元素的单个列表，元素按输入列表排序。由于这个方法是使用了@SafeVarargs注解，因此在其方法声明和被调用的时候，都不会生成警告。方法代码如下：
+
+```java
+// Safe method with a generic varargs parameter
+   @SafeVarargs
+   static <T> List<T> flatten(List<? extends T>... lists) {
+       List<T> result = new ArrayList<>();
+       for (List<? extends T> list : lists)
+           result.addAll(list);
+       return result;
+   }
+```
+
+> The rule for deciding when to use the SafeVarargs annotation is simple: **Use** **@SafeVarargs** **on every method with a varargs parameter of a generic or parameterized type,** so its users won’t be burdened by needless and confusing compiler warnings. This implies that you should *never* write unsafe varargs methods like dangerous or toArray. Every time the compiler warns you of possible heap pollution from a generic varargs parameter in a method you control, check that the method is safe. As a reminder, a generic varargs methods is safe if:
+>
+> 1. it doesn’t store anything in the varargs parameter array, and
+>
+> 2. it doesn’t make the array (or a clone) visible to untrusted code. 
+>
+>    If either of these prohibitions is violated, fix it.
+
+决定什么时候使用SafeVarargs注解的规则很简单：**在每一个可变参数中包含泛型或者参数化类型的方法上都使用@SafeVarargs**，这样，它的用户就不用面对那些没用并且让人困惑的warning了。这也以为这你永远都不应该写像dangerous或者toArray这样的不安全的可变参数方法。当编译器警告你，在你控制的方法的泛型可变参数中可能会有堆污染时，需要检测一下这个方法是否安全。再提醒一下，只有以下这两个条件都满足的时候，泛型可变参数方法才是安全的。
+
+1. 方法没有往可变参数数组中存放任何东西；
+2. 方法没有让这个数组（或者其克隆）对其他不可信任的代码可见。
+
+如果违反了这两个禁令中的任何一条，就要立即修正它。
+
+> Note that the SafeVarargs annotation is legal only on methods that can’t be overridden, because it is impossible to guarantee that every possible overriding method will be safe. In Java 8, the annotation was legal only on static methods and final instance methods; in Java 9, it became legal on private instance methods as well.
+>
+> An alternative to using the SafeVarargs annotation is to take the advice of Item 28 and replace the varargs parameter (which is an array in disguise) with a List parameter. Here’s how this approach looks when applied to our flatten method. Note that only the parameter declaration has changed:
+
+
+
 
 
 

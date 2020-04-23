@@ -182,7 +182,7 @@ if (o instanceof Set) { // Raw type
 
 > Note that once you’ve determined that o is a Set, you must cast it to the wildcard type Set<?>, not the raw type Set. This is a checked cast, so it will not cause a compiler warning.
 
-需要注意的是， 一旦你确定了o是一个Set，就不必须讲题转化为通配符类型Set<?>，而不是原生类型。这是一个受检的转化，这样就不会出现编译器警告了。
+需要注意的是， 一旦你确定了o是一个Set，就必须将其转化为通配符类型Set<?>，而不是原生类型。这是一个受检的转化，这样就不会出现编译器警告了。
 
 > In summary, using raw types can lead to exceptions at runtime, so don’t use them. They are provided only for compatibility and interoperability with legacy code that predates the introduction of generics. As a quick review, Set<Object> is a parameterized type representing a set that can contain objects of any type, Set<?> is a wildcard type representing a set that can contain only objects of some unknown type, and Set is a raw type, which opts out of the generic type system. The first two are safe, and the last is not.
 >

@@ -172,13 +172,118 @@ Set<Number>  numbers  = union(integers, doubles);
 
 > Prior to Java 8, the type inference rules were not clever enough to handle the previous code fragment, which requires the compiler to use the contextually specified return type (or *target type*) to infer the type of E. The target type of the union invocation shown earlier is Set<Number>. If you try to compile the fragment in an earlier version of Java (with an appropriate replacement for the Set.of factory), you’ll get a long, convoluted error message like this:
 
+在Java8之前的版本中，类型推导规则还没有聪明到可以处理前面的那段代码，还需要编译器使用上下文指定的返回类型（或者目标类型）来推导出E的类型。前面的union方法调用的目标类型是Set<Number>。当你在早期的Java版本里编译这段代码的时候（也使用Set.of工厂方法对应的替代方法），你将得到一个很长的，错综复杂的error信息如下：
 
+```java
+Union.java:14: error: incompatible types
+           Set<Number> numbers = union(integers, doubles);
+																	^
+     required: Set<Number>
+     found:    Set<INT#1>
+     where INT#1,INT#2 are intersection types:
+       INT#1 extends Number,Comparable<? extends INT#2>
+       INT#2 extends Number,Comparable<?>
+```
 
+> Luckily there is a way to deal with this sort of error. If the compiler doesn’t infer the correct type, you can always tell it what type to use with an *explicit type* *argument* [JLS, 15.12]. Even prior to the introduction of target typing in Java 8, this isn’t something that you had to do often, which is good because explicit type arguments aren’t very pretty. With the addition of an explicit type argument, as shown here, the code fragment compiles cleanly in versions prior to Java 8:
 
+还好，还是有办法来解决这种错误。如果编译器不能推导出正确的类型，你就可以使用显示的类型参数来告诉它应该使用什么样的类型[JLS, 15.12]。即使在Java8引入目标类型之前，这种操作也并不是需要经常做，这是一件好事，因为显式的类型参数很丑。添加了显式的类型参数后，代码如下，这段代码就可以在Java8之前的版本中，干净的编译了。
 
+```java
+// Explicit type parameter - required prior to Java 8 
+Set<Number> numbers = Union.<Number>union(integers, doubles);
+```
 
+> Next let’s turn our attention to the max method in Item 30. Here is the original declaration:
 
+接下来，让我们把注意力放在Item30里的max方法里，下面是它原先的声明：
 
+```java
+public static <T extends Comparable<T>> T max(List<T> list)
+```
+
+> Here is a revised declaration that uses wildcard types:
+
+下面是其使用通配符类型修改后的声明：
+
+```java
+public static <T extends Comparable<? super T>> T max( List<? extends T> list)
+```
+
+> To get the revised declaration from the original, we applied the PECS heuristic twice. The straightforward application is to the parameter list. It produces T instances, so we change the type from List<T> to List<? extends T>. The tricky application is to the type parameter T. This is the first time we’ve seen a wildcard applied to a type parameter. Originally, T was specified to extend Comparable<T>, but a comparable of T consumes T instances (and produces integers indicating order relations). Therefore, the parameterized type Comparable<T> is replaced by the bounded wildcard type Comparable<? super T>. Comparables are always consumers, so you should generally **use** **Comparable <? super T> in preference to** **Comparable<T>.** The same is true of comparators; therefore, you should generally **use** **Comparator<? super T>** **in preference to** **Comparator<T>.**
+
+为了将原先的声明修改到现在的版本，我们需要将PECS原则应用两次。对参数list的应用比较简单，它生产了T实例，因此我们将List<T>改为List<? extends T>。对类型参数T的应用比较复杂了，这是我们第一次看将通配符引用到类型参数上。一开始，T是用来扩展Comparable<T>的，但是T的comparable消费了T实例（生成可以表示顺序关系的integer）。因此类型化参数Comparable<T>被替换成了有限制的通配符类型Comparable<? super T>。Comparable都是消费者，所以通常情况下，**都应该优先使用Comparable <? super T>而不是Comparable<T>**。对于Comparator也一样，所以通常情况下，**都应该优先使用Comparator <? super T>而不是Comparator<T>**。
+
+> The revised max declaration is probably the most complex method declaration in this book. Does the added complexity really buy you anything? Again, it does. Here is a simple example of a list that would be excluded by the original declaration but is permitted by the revised one:
+
+这个修改后的max声明大概是本书中最复杂的方法声明了。那么增加的复杂度真的能起到什么作用吗？是的，是有用的。下面是一个list的简单例子，自原始的方法声明中无法使用，但是在修改后的方法中却是允许的。
+
+```java
+List<ScheduledFuture<?>> scheduledFutures = ... ;
+```
+
+> The reason that you can’t apply the original method declaration to this list is that ScheduledFuture does not implement Comparable<ScheduledFuture>. Instead, it is a subinterface of Delayed, which extends Comparable<Delayed>. In other words, a ScheduledFuture instance isn’t merely comparable to other ScheduledFuture instances; it is comparable to any Delayed instance, and that’s enough to cause the original declaration to reject it. More generally, the wildcard is required to support types that do not implement Comparable (or Comparator) directly but extend a type that does.
+
+不能在原先的声明中使用这个list的原因是，ScheduledFuture并没有实现Comparable<ScheduledFuture>，而ScheduledFuture是Delayed的子接口，而Delayed实现了Comparable<Delayed>。换句话说，ScheduledFuture不仅仅可以和其他的ScheduledFuture实例比较，还可以和任何一个Delayed实例比较，这些就足够使得原始的声明会拒绝它了。更通俗地说，通配符可以用来支持这种类型，它没有直接实现Comparable（或者Comparator），而是继承一个实现了Comparable（或者Comparator）的类型。
+
+> There is one more wildcard-related topic that bears discussing. There is a duality between type parameters and wildcards, and many methods can be declared using one or the other. For example, here are two possible declarations for a static method to swap two indexed items in a list. The first uses an unbounded type parameter (Item 30) and the second an unbounded wildcard:
+
+还有一个和通配符相关的话题需要讨论。类型参数和通配符之间具有双重性，很多方法，都使用其中一个或者另一个进行声明。比如，下面这个用来交换list中两个被索引元素的静态方法，有两种可能的声明如下：第一个使用的是无限制的类型参数（Item30），而第二个使用的是无限制的通配符。
+
+```java
+// Two possible declarations for the swap method
+public static <E> void swap(List<E> list, int i, int j); 
+public static void swap(List<?> list, int i, int j);
+```
+
+> Which of these two declarations is preferable, and why? In a public API, the second is better because it’s simpler. You pass in a list—any list—and the method swaps the indexed elements. There is no type parameter to worry about. As a rule, **if a type parameter appears only once in a method declaration, replace it with a wildcard.** If it’s an unbounded type parameter, replace it with an unbounded wildcard; if it’s a bounded type parameter, replace it with a bounded wildcard.
+
+这两种声明哪一个更好呢？为什么呢？在一个公开的API中，第二个要好一些，因为要简单一些。你可以直接传一个List，任意一个List，这个方法就会交换这指定索引位置上的元素。完全不需要去考虑类型参数。有一个规则，**如果类型参数只在方法的声明中出现了一次，就可以用通配符来替代它**。如果是一个无限制的类型参数，就用无限制的通配符，如果是一个有限制的类型参数，就用有限制的通配符。
+
+> There’s one problem with the second declaration for swap. The straightforward implementation won’t compile:
+
+在使用第二种方法声明进行交换的时候，有一个问题。下面这种直接的实现无法编译：
+
+```java
+public static void swap(List<?> list, int i, int j) {
+       list.set(i, list.set(j, list.get(i)));
+}
+```
+
+> Trying to compile it produces this less-than-helpful error message:
+
+当你编译的时候，会生成这样一个没什么用的错误信息：
+
+```java
+Swap.java:5: error: incompatible types: Object cannot be
+   converted to CAP#1
+           list.set(i, list.set(j, list.get(i)));
+                                           ^
+     where CAP#1 is a fresh type-variable:
+       CAP#1 extends Object from capture of ?
+```
+
+> It doesn’t seem right that we can’t put an element back into the list that we just took it out of. The problem is that the type of list is List<?>, and you can’t put any value except null into a List< ？>. Fortunately, there is a way to implement this method without resorting to an unsafe cast or a raw type. The idea is to write a private helper method to *capture* the wildcard type. The helper method must be a generic method in order to capture the type. Here’s how it looks:
+
+我们无法把一个从列表里拿出来的元素再放回去，这看起来有些不正常。这里的问题在于这个列表的类型是List<?>，不能往List< ？>里放除了null以外的任何值。幸运的是，在不需要不安全的转换和原生类型的前提下，还是有方法实现这个方法。最好的方法是写一个私有的辅助方法来捕获通配符类型。为了捕获类型，这个辅助方法必须是泛型方法。下面是其代码：
+
+```java
+public static void swap(List<?> list, int i, int j) {
+       swapHelper(list, i, j);
+}
+// Private helper method for wildcard capture
+private static <E> void swapHelper(List<E> list, int i, int j) { 
+			 list.set(i, list.set(j, list.get(i)));
+}
+```
+
+> The swapHelper method knows that list is a List<E>. Therefore, it knows that any value it gets out of this list is of type E and that it’s safe to put any value of type E into the list. This slightly convoluted implementation of swap compiles cleanly. It allows us to export the nice wildcard-based declaration, while taking advantage of the more complex generic method internally. Clients of the swap method don’t have to confront the more complex swapHelper declaration, but they do benefit from it. It is worth noting that the helper method has precisely the signature that we dismissed as too complex for the public method.
+
+这个swapHepler方法就知道这个列表是List<E>了。因此它知道从这个列表中拿出来的类型都是E，可以安全地放回到这个List里去。这个有点复杂的swap实现可以干干净净地编译。它使得我们可以导出一个基于通配符的好的声明，并在其内部使用了比较复杂的泛型方法。swap方法的客户端并不需要面对这个复杂的swapHelper声明，就可以从中受益。值得一提的是，这个辅助方法的精确的方法签名，正是我们因为太复杂而在公有方法中所放弃的签名。
+
+> In summary, using wildcard types in your APIs, while tricky, makes the APIs far more flexible. If you write a library that will be widely used, the proper use of wildcard types should be considered mandatory. Remember the basic rule: producer-extends, consumer-super (PECS). Also remember that all comparables and comparators are consumers.
+
+总结一下，在API中使用通配符，虽然有点复杂，但是会让API变得很灵活。如果你在写一个需要广泛使用的类库，就必须要使用合适的通配符类型。记住这个基本规则：producer-extends，comsumer-super（PECS)。同时也记住所有的comparable和comparator都是消费者。
 
 
 

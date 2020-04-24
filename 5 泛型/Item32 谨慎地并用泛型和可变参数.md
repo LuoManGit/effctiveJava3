@@ -141,25 +141,64 @@ public static void main(String[] args) {
 >
 > An alternative to using the SafeVarargs annotation is to take the advice of Item 28 and replace the varargs parameter (which is an array in disguise) with a List parameter. Here’s how this approach looks when applied to our flatten method. Note that only the parameter declaration has changed:
 
+注意，SafeVarargs注解只在不能被覆盖的方法上是合法的，因为不可能保证每一个覆盖后的方法都是安全的。因此，在java8里，SafeVarargs注解只能用在static方法上，或者final实例方法上；在java9里，用在私有实例方法上也变得有效了。
 
+SafeVarargs注解的一个可选的替代方案，是根据Item28的建议，使用列表参数代替可变参数（其本质是一个数组）。下面是这个方法在flatten方法上的应用。需要注意的是，这里只有参数声明被修改了：
 
+```java
+// List as a typesafe alternative to a generic varargs parameter 
+static <T> List<T> flatten(List<List<? extends T>> lists) {
+       List<T> result = new ArrayList<>();
+       for (List<? extends T> list : lists)
+           result.addAll(list);
+       return result;
+}
+```
 
+> This method can then be used in conjunction with the static factory method List.of to allow for a variable number of arguments. Note that this approach relies on the fact that the List.of declaration is annotated with @SafeVarargs:
 
+这个方法可以和静态工厂方法List.of一起使用，List.of方法可以有数量可变的参数。需要注意的是，这个方法的前提是List.of的声明使用了@SafeVarargs注解。使用代码如下：
 
+```java
+audience = flatten(List.of(friends, romans, countrymen));
+```
 
+> The advantage of this approach is that the compiler can *prove* that the method is typesafe. You don’t have to vouch for its safety with a SafeVarargs annotation, and you don’t have worry that you might have erred in determining that it was safe. The main disadvantage is that the client code is a bit more verbose and may be a bit slower.
+>
+> This trick can also be used in situations where it is impossible to write a safe varargs method, as is the case with the toArray method on page 147. Its List analogue *is* the List.of method, so we don’t even have to write it; the Java libraries authors have done the work for us. The pickTwo method then becomes this:
 
+这个方法的优势在于，编译器可以证明这个方法是类型安全的。你不用通过SafeVarargs注解来保证它的安全，也不用担心你可能会错误地认为它是安全的。这个方法主要的缺点在于，这个客户端代码有点啰嗦，运行有点慢。
 
+这个方法还可能用在那些没办法写一个安全的可变参数方法的场景，比如前面的toArray方法，其List对应的方法就是List.of，因此我们甚至不用自己写，java类库作者已经为我们完成了这些工作。这个pickTwo方法就可以变成下面这样：
 
+```java
+static <T> List<T> pickTwo(T a, T b, T c) { 
+  	switch(rnd.nextInt(3)) {
+			case 0: return List.of(a, b); 
+      case 1: return List.of(a, c); 
+      case 2: return List.of(b, c);
+		}
+       throw new AssertionError();
+   }
+```
 
+> and the main method becomes this:
 
+这个main方法就变成这样了：
 
+```java
+public static void main(String[] args) {
+		List<String> attributes = pickTwo("Good", "Fast", "Cheap");
+}
+```
 
+> The resulting code is typesafe because it uses only generics, and not arrays.
+>
+>  In summary, varargs and generics do not interact well because the varargs facility is a leaky abstraction built atop arrays, and arrays have different type rules from generics. Though generic varargs parameters are not typesafe, they are legal. If you choose to write a method with a generic (or parameterized) varargs parameter, first ensure that the method is typesafe, and then annotate it with @SafeVarargs so it is not unpleasant to use.
 
+这样得到的代码是类型安全的，因为它只用了泛型，没有用数组。
 
-
-
-
-
+总结一下，由于可变参数技术是基于数组的一个技术露底，而数组和泛型在类型规则上有所不同，因此可变参数和泛型不能很好的合作。虽然泛型可变参数不是类型安全的，但是他们是合法的。当你选择要写一个泛型（或者参数化）可变参数方法的时候，第一步就是要确保这个方法是类型安全额，然后使用@SafeVarargs进行注解，这样就能愉快地使用这个方法了。
 
 
 

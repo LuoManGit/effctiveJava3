@@ -257,11 +257,136 @@ public static void main(String[] args) {
 
 > Enum types have an automatically generated valueOf(String) method that translates a constant’s name into the constant itself. If you override the toString method in an enum type, consider writing a fromString method to translate the custom string representation back to the corresponding enum. The following code (with the type name changed appropriately) will do the trick for any enum, so long as each constant has a unique string representation:
 
+Enum类型有一个自动生成的valueOf(String)方法，可以将常量的名字转换为常量本身（*这个方法是和toString方法相对应的*），如果你覆盖了toString，就需要考虑写一个fromString方法，来把习惯的字符串表达转换为对应的枚举。下面这个代码（按照需要改变类型的名字）可以为所有的Enum类型提供这一技巧，只要每一个常量都有一个独一无二的字符串表达：
 
+```java
+// Implementing a fromString method on an enum type
+   private static final Map<String, Operation> stringToEnum =
+           Stream.of(values()).collect(
+               toMap(Object::toString, e -> e));
+   // Returns Operation for string, if any
+   public static Optional<Operation> fromString(String symbol) {
+       return Optional.ofNullable(stringToEnum.get(symbol));
+   }
+```
 
+> Note that the Operation constants are put into the stringToEnum map from a static field initialization that runs after the enum constants have been created. The previous code uses a stream (Chapter 7) over the array returned by the values() method; prior to Java 8, we would have created an empty hash map and iterated over the values array inserting the string-to-enum mappings into the map, and you can still do it that way if you prefer. But note that attempting to have each constant put itself into a map from its own constructor does *not* work. It would cause a compilation error, which is good thing because if it were legal, it would cause a NullPointerException at runtime. Enum constructors aren’t permitted to access the enum’s static fields, with the exception of constant variables (Item 34). This restriction is necessary because static fields have not yet been initialized when enum constructors run. A special case of this restriction is that enum constants cannot access one another from their constructors.
 
+需要注意的是，在枚举常量被创建后，Operation常量在一个静态域的初始化中被放在stringToEnum map中。前面的代码在values返回的数组上使用了Stream（Chapter 7)；在Java8之前，我们可能会创建一个空的HashMap，然后遍历这个值数组，把字符串到枚举实例的映射添加到map里去；你也可以按照你喜欢的方法来做。但是需要注意的是，企图在每一个实例的构造器中将自己放在map里的操作是不可行的，会生成一个编译器error，这是好事，因为如果他是合法的话，在运行时就会生成NullPointException。Enum构造器不允许访问除了常量域以外Enum的静态域。这个限制是很有必要的，因为当枚举构造器执行的时候，其静态域还没有进行初始化。这个限制有一个特殊的情况就是，enum常量也不同通过构造器访问其他的常量。
 
+> Also note that the fromString method returns an Optional<String>. This allows the method to indicate that the string that was passed in does not represent a valid operation, and it forces the client to confront this possibility (Item 55).
 
+还需要注意的是fromString返回的是一个Optional<String>。它表明：传进来的字符串可能并不是一个合法的操作，并强迫客户端面对这一可能性（Item55）。
+
+> A disadvantage of constant-specific method implementations is that they make it harder to share code among enum constants. For example, consider an enum representing the days of the week in a payroll package. This enum has a method that calculates a worker’s pay for that day given the worker’s base salary (per hour) and the number of minutes worked on that day. On the five weekdays, any time worked in excess of a normal shift generates overtime pay; on the two weekend days, all work generates overtime pay. With a switch statement, it’s easy to do this calculation by applying multiple case labels to each of two code fragments:
+
+特定于常量的方法实现的一个缺点是很难在Enum常量之间共享代码。比如，有一个枚举表示薪资包里的一周的每一天。这个枚举有一个方法，通过给定工人的基本工资（每小时）以及当前的工作时长，来计算该本人当天的工资。在5个工作日，所有超出正常工作时间的工资都需要产生额外工资，在两个休息日，所有的工作时长都应该产生额外工资。使用switch语句，很容易将不同的条件分配到两个代码片段中，来完成这个计算：
+
+```java
+// Enum that switches on its value to share code - questionable
+   enum PayrollDay {
+       MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY,
+       SATURDAY, SUNDAY;
+       private static final int MINS_PER_SHIFT = 8 * 60;
+       int pay(int minutesWorked, int payRate) {
+           int basePay = minutesWorked * payRate;
+           int overtimePay;
+           switch(this) {
+             case SATURDAY: case SUNDAY: // Weekend
+               overtimePay = basePay / 2;
+               break;
+             default: // Weekday
+							 overtimePay = minutesWorked <= MINS_PER_SHIFT ?
+							 0 : (minutesWorked - MINS_PER_SHIFT) * payRate / 2;
+						}
+           return basePay + overtimePay;
+       }
+}
+```
+
+> This code is undeniably concise, but it is dangerous from a maintenance perspective. Suppose you add an element to the enum, perhaps a special value to represent a vacation day, but forget to add a corresponding case to the switch statement. The program will still compile, but the pay method will silently pay the worker the same amount for a vacation day as for an ordinary weekday.
+
+这段代码确实很简洁，但是从维护的角度上来看，是很危险的。假如你往这个枚举中添加了一个新的元素，或许是一个表示节假日的特殊的值，但是忘记了在switch语句中添加对应的case里。这个程序还是可以编译，但是其pay方法会默默地将工人节假日的工作支付，计算得和普通的休息日一样。
+
+> To perform the pay calculation safely with constant-specific method implementations, you would have to duplicate the overtime pay computation for each constant, or move the computation into two helper methods, one for weekdays and one for weekend days, and invoke the appropriate helper method from each constant. Either approach would result in a fair amount of boilerplate code, substantially reducing readability and increasing the opportunity for error.
+
+为了使用特定于常量的方法实现来安全的执行工资计算，你可能必须要为每一个常量，复制额外工资的计算；或者把这些计算放在两个辅助方法里，一个用来计算工作日，一个用来计算休息日，然后在每一个常量中调用对应的辅助方法。这两种实现都将生产大量的样板代码，极大地降低了可读性，并增加了出错的概率。
+
+> The boilerplate could be reduced by replacing the abstract overtimePay method on PayrollDay with a concrete method that performs the overtime calculation for weekdays. Then only the weekend days would have to override the method. But this would have the same disadvantage as the switch statement: if you added another day without overriding the overtimePay method, you would silently inherit the weekday calculation.
+
+这些样板代码可以通过以下方法来减少：将PayrollDay中的抽象overtimePay方法改为计算工作日的额外工资的具体方法。然后，就只有休息日需要覆盖这个方法了。但是这个方法和switch语句有一样的缺点了：如果你新增了另外一个日子，没有覆盖这个overtimePay方法，也就默认使用了工作日的计算方法。
+
+> What you really want is to be *forced* to choose an overtime pay strategy each time you add an enum constant. Luckily, there is a nice way to achieve this. The idea is to move the overtime pay computation into a private nested enum, and to pass an instance of this *strategy enum* to the constructor for the PayrollDay enum. The PayrollDay enum then delegates the overtime pay calculation to the strategy enum, eliminating the need for a switch statement or constant-specific method implementation in PayrollDay. While this pattern is less concise than the switch statement, it is safer and more flexible:
+
+我们真正想要的，就是当我们新增一个枚举常量的时候，每次都需要强制选择一个计算额外工资的策略。幸运的是，有一个很好的方法可以做到。这个方法就是将额外工资的计算放在私有嵌套枚举类中，然后在PayrollDay枚举的构造器中传入一个策略枚举（*即私有嵌套枚举*）的实例。然后PayrollDay枚举将额外工资的计算委托给策略枚举，在PayrollDay里便不再需要switch语句和特定于实例的方法实现了。虽然这种模式没有switch语句简洁，但是它更安全，也更灵活。代码如下：
+
+```java
+// The strategy enum pattern
+   enum PayrollDay {
+       MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY,
+       SATURDAY(PayType.WEEKEND), SUNDAY(PayType.WEEKEND);
+       private final PayType payType;
+       PayrollDay(PayType payType) { this.payType = payType; }
+       PayrollDay() { this(PayType.WEEKDAY); }  // Default
+       int pay(int minutesWorked, int payRate) {
+           return payType.pay(minutesWorked, payRate);
+			 }
+       // The strategy enum type
+       private enum PayType {
+           WEEKDAY {
+               int overtimePay(int minsWorked, int payRate) {
+                   return minsWorked <= MINS_PER_SHIFT ? 0 :
+                     (minsWorked - MINS_PER_SHIFT) * payRate / 2;
+								} 
+           },
+           WEEKEND {
+               int overtimePay(int minsWorked, int payRate) {
+                   return minsWorked * payRate / 2;
+               }
+					 };
+           abstract int overtimePay(int mins, int payRate);
+           private static final int MINS_PER_SHIFT = 8 * 60;
+           int pay(int minsWorked, int payRate) {
+               int basePay = minsWorked * payRate;
+               return basePay + overtimePay(minsWorked, payRate);
+						} 
+       }
+}
+```
+
+> If switch statements on enums are not a good choice for implementing constant-specific behavior on enums, what *are* they good for? **Switches on enums are good for augmenting enum types with constant-specific behavior.** For example, suppose the Operation enum is not under your control and you wish it had an instance method to return the inverse of each operation. You could simulate the effect with the following static method:
+
+既然switch 语句不是用来实现枚举中特定于常量的行为的最好的选择，那它有什么用处呢？**枚举上的Switch语句可以用来给枚举类型增加一个特定于常量的行为**。比如，假如这个Operation枚举不在你的控制范围内，然后你希望它有一个实例方法来返回每个操作的反操作。你可以使用如下的静态方法来模拟这一效果：
+
+```java
+// Switch on an enum to simulate a missing method
+public static Operation inverse(Operation op) {
+       switch(op) {
+           case PLUS:   return Operation.MINUS;
+           case MINUS:  return Operation.PLUS;
+           case TIMES:  return Operation.DIVIDE;
+           case DIVIDE: return Operation.TIMES;
+           
+					 default: throw new AssertionError("Unknownop:"+op); 
+       }
+}
+```
+
+> You should also use this technique on enum types that *are* under your control if a method simply doesn’t belong in the enum type. The method may be required for some use but is not generally useful enough to merit inclusion in the enum type.
+
+如果这个方法确实不属于这个枚举类型，你也可以在那些受你控制的枚举中使用这个技巧。这个方法有点用处，但是又还不至于要放到enum类型里面去。
+
+> Enums are, generally speaking, comparable in performance to int constants. A minor performance disadvantage of enums is that there is a space and time cost to load and initialize enum types, but it is unlikely to be noticeable in practice.
+
+通常来说，枚举类型在性能上和int常量差不多。枚举常量的一个小小的性能缺陷是在加载和初始化枚举类型的时候需要空间和时间成本，但是在实际应用中，几乎无法察觉。
+
+> So when should you use enums? **Use enums any time you need a set of constants whose members are known at compile time.** Of course, this includes “natural enumerated types,” such as the planets, the days of the week, and the chess pieces. But it also includes other sets for which you know all the possible values at compile time, such as choices on a menu, operation codes, and command line flags. **It is not necessary that the set of constants in an enum type stay fixed for all time.** The enum feature was specifically designed to allow for binary compatible evolution of enum types.
+
+那么什么时候应该使用枚举类型呢？**当你需要一组固定的常量集合，并且在编译时就知道其成员的时候，就应该使用枚举**。当然，这就包括一些“自然枚举类型”，比如行星们，一周的天数以及棋子的数目。当然还包括一些其他在编译时就知道其所有可能的值的集合，比如，菜单的选项，运算符，和命令行标志。**并不需要枚举类型中的常量集合一直保持不变**。专门设计的枚举类型的特性可以允许枚举类型随时间演变。
+
+> In summary, the advantages of enum types over int constants are compelling. Enums are more readable, safer, and more powerful. Many enums require no explicit constructors or members, but others benefit from associating data with each constant and providing methods whose behavior is affected by this data. Fewer enums benefit from associating multiple behaviors with a single method. In this relatively rare case, prefer constant-specific methods to enums that switch on their own values. Consider the strategy enum pattern if some, but not all, enum constants share common behaviors.
+
+总的来说，枚举类型相对于int常量的优势是让人难以拒绝的。枚举类型可读性更好，更安全，也更加强大。一些枚举类型不需要显示的构造器和成员，也有一些枚举可以从每个常量关联的数据，以及提供的行为受数据影响的方法中获得好处。少数的枚举需要将多个行为和一个方法关联，在这种比较少的情况下，特定于常量的方法实现，比在枚举值上进行switch，要好得多。当有多个（但不是全部）使用需要共用相同的行为的时候，可以考虑使用策略枚举模式。
 
 
 

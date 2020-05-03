@@ -115,27 +115,16 @@ public enum Operation {
 
 > Looking at the lambda-based Operation enum, you might think constant- specific method bodies have outlived their usefulness, but this is not the case. Unlike methods and classes, **lambdas lack names and documentation; if a computation isn’t self-explanatory, or exceeds a few lines, don’t put it in a lambda.** One line is ideal for a lambda, and three lines is a reasonable maximum. If you violate this rule, it can cause serious harm to the readability of your programs. If a lambda is long or difficult to read, either find a way to simplify it or refactor your program to eliminate it. Also, the arguments passed to enum constructors are evaluated in a static context. Thus, lambdas in enum constructors can’t access instance members of the enum. Constant-specific class bodies are still the way to go if an enum type has constant-specific behavior that is difficult to understand, that can’t be implemented in a few lines, or that requires access to instance fields or methods.
 
+看着这个基于lambda的操作枚举，你可能会觉得特定于常量的方法体已经形同虚设了，但实际并非如此。和方法和类不一样，**lambdas缺少名字和文档说明，如果一个计算不是自解释的，或者超过了一定行数，就不要把它放在lambda里。**对于lambda而言，一行是最理想的，三行是合理的最大极限。如果你打破了这个规则，就会对程序的可读性造成巨大的伤害。如果一个lambda很长或者很难阅读，都应该想办法简化它，或者重构你的程序来消除它。并且，传递的enum构造器的参数是在静态上下文中计算的，因此，在枚举构造器中的lambda不能范文枚举的实例成员。当一个枚举类型的特定于常量的行为很难理解，或者不能用很少的行数来实现，或者需要党文实例域和方法的时候，都应该使用特定于常量的方法体。
 
+> Likewise, you might think that anonymous classes are obsolete in the era of lambdas. This is closer to the truth, but there are a few things you can do with anonymous classes that you can’t do with lambdas. Lambdas are limited to functional interfaces. If you want to create an instance of an abstract class, you can do it with an anonymous class, but not a lambda. Similarly, you can use anonymous classes to create instances of interfaces with multiple abstract methods. Finally, a lambda cannot obtain a reference to itself. In a lambda, the this keyword refers to the enclosing instance, which is typically what you want. In an anonymous class, the this keyword refers to the anonymous class instance. If you need access to the function object from within its body, then you must use an anonymous class.
 
+同样地，你可能会认为在lambdas的时代，匿名类也过时了。虽然这和现实很相近，但是还是有一些情况，你只能使用匿名类而不能使用lambdas。lambdas只能用在函数式接口上，如果你想创建一个抽象类的实例，你就只能使用匿名类，而不是lambda。同样地，你还可以使用匿名类来创建有多个抽象方法的接口的实例。最后lambda不能获取自身的引用。在lambda里，this关键字指的是外围的实例，通常情况下，这也正是你想要的。而在匿名类中，this关键字指的是这个匿名类实例。如果你需要在函数对象的主体的访问它自己，你就必须使用匿名类。
 
+> Lambdas share with anonymous classes the property that you can’t reliably serialize and deserialize them across implementations. Therefore, **you should rarely, if ever, serialize a lambda** (or an anonymous class instance). If you have a function object that you want to make serializable, such as a Comparator, use an instance of a private static nested class (Item 24).
 
+lambdas和匿名类有一个同样的属性，你不能可靠地通过实现来序列化和反序列化。因此，你尽可能不要（除非迫不得已）序列化一个lambda，或者匿名类实例。如果你确实需要序列化一个函数对象，比如Comparator，你可以使用私有静态内部类的实例来表示它（Item24）。
 
+> In summary, as of Java 8, lambdas are by far the best way to represent small function objects. **Don’t use anonymous classes for function objects unless you have to create instances of types that aren’t functional interfaces.** Also, remember that lambdas make it so easy to represent small function objects that it opens the door to functional programming techniques that were not previously practical in Java.
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+总结一下，在Java8中，lambda是用来表达小的函数对象的最佳方法。**除非你要创建的实例类型不是函数接口，否则不要使用匿名类来创建函数对象。**并且，由于lambda表示小的函数对象很容易，因此，在原本很少使用函数编程的Java中，打开了函数编程的大门。

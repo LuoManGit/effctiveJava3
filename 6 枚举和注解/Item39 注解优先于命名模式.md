@@ -304,3 +304,4 @@ if (m.isAnnotationPresent(ExceptionTest.class)) {
 > That said, with the exception of toolsmiths, most programmers will have no need to define annotation types. But **all programmers should use the predefined annotation types that Java provides** (Items 40, 27). Also, consider using the annotations provided by your IDE or static analysis tools. Such annotations can improve the quality of the diagnostic information provided by these tools. Note, however, that these annotations have yet to be standardized, so you may have some work to do if you switch tools or if a standard emerges.
 
 也就是说，除了”工具铁匠(平台框架程序员）“以外，大部分的程序员都不需要定义注解类型。但是**所有的程序员都应该使用Java提供的定义好的注解（Item40，27）**。同样的，考虑使用你的IDE或者静态分析工具提供的注解。这些注解可以提升这些工具提供的诊断信息的质量。但是需要注意的是，这些注意还没有标准化，如果你要换一个工具，或者生成一个标准，你就有很多的工作需要做了。
+

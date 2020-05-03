@@ -6,7 +6,7 @@
 
 >A stream pipeline consists of a source stream followed by zero or more *intermediate operations* and one *terminal operation*. Each intermediate operation transforms the stream in some way, such as mapping each element to a function of that element or filtering out all elements that do not satisfy some condition. Intermediate operations all transform one stream into another, whose element type may be the same as the input stream or different from it. The terminal operation performs a final computation on the stream resulting from the last intermediate operation, such as storing its elements into a collection, returning a certain element, or printing all of its elements.
 
-一个Stream Pipeline中包括一个源Stream，紧跟着0个或多个中间操作，和一个终止操作。每一个中间操作都使用一些方式对Stream进行转换，比如把每个元素映射到这个元素的函数上，或者过滤掉不满足条件的所有元素。中间操作总是把一个Stream转换成另一个Stream，它的元素类型可能和输入Stream相同，也可能不同。终止操作会对从最后一个中间操作得到的Stream进行最后的计算，比如把元素保存在集合中，返回一个特定的袁术，或者打印所有的元素。
+一个Stream Pipeline中包括一个源Stream，紧跟着0个或多个中间操作，和一个终止操作。每一个中间操作都使用一些方式对Stream进行转换，比如把每个元素映射到这个元素的函数上，或者过滤掉不满足条件的所有元素。中间操作总是把一个Stream转换成另一个Stream，它的元素类型可能和输入Stream相同，也可能不同。终止操作会对从最后一个中间操作得到的Stream进行最后的计算，比如把元素保存在集合中，返回一个特定的元素，或者打印所有的元素。
 
 > Stream pipelines are evaluated *lazily*: evaluation doesn’t start until the terminal operation is invoked, and data elements that aren’t required in order to complete the terminal operation are never computed. This lazy evaluation is what makes it possible to work with infinite streams. Note that a stream pipeline without a terminal operation is a silent no-op, so don’t forget to include one.
 
@@ -22,7 +22,7 @@ Stream的API是流式的：这样的设计使得pipeline中的所有的调用可
 
 > The streams API is sufficiently versatile that practically any computation can be performed using streams, but just because you can doesn’t mean you should. When used appropriately, streams can make programs shorter and clearer; when used inappropriately, they can make programs difficult to read and maintain. There are no hard and fast rules for when to use streams, but there are heuristics.
 
-Stream 的API多种多样，足够用Stream进行所有的计算，但是可以做到，并不意味着你应该这做。当使用得当的时候，Stream可以让程序更加简洁明了；但是使用不当的时候，Stream可以让程序很难阅读和维护。使用Stream没有捷径，但是还是可以有所启发。
+Stream 的API多种多样，足够用Stream进行所有的计算，但是可以做到，并不意味着你应该这做。当使用得当的时候，Stream可以让程序更加简洁明了；但是使用不当的时候，Stream可以让程序很难阅读和维护。使用Stream没有捷径，但是还是可以通过一些例子有所启发。
 
 > Consider the following program, which reads the words from a dictionary file and prints all the anagram groups whose size meets a user-specified minimum. Recall that two words are anagrams if they consist of the same letters in a different order. The program reads each word from a user-specified dictionary file and places the words into a map. The map key is the word with its letters alphabetized, so the key for "staple" is "aelpst", and the key for "petals" is also "aelpst": the two words are anagrams, and all anagrams share the same alphabetized form (or *alphagram*, as it is sometimes known). The map value is a list containing all of the words that share an alphabetized form. After the dictionary has been processed, each list is a complete anagram group. The program then iterates through the map’s values() view and prints each list whose size meets the threshold:
 
@@ -144,28 +144,109 @@ public class Anagrams {
 
 当你开始使用stream的时候，你可能会有强烈的欲望来把所有的步骤都转换为stream，但是请抑制住这种欲望。虽然这样做是可能的，但是这会严重损害代码的可读性和可维护性。一般来说，即使是相当复杂的任务，也是使用stream和迭代的结合来实现的，就像前面的Anagrams程序一样。因此**只在确实有意义的地方，才使用stream来重构代码或者在新的代码中使用stream。**
 
-> As shown in the programs in this item, stream pipelines express repeated com- putation using function objects (typically lambdas or method references), while iterative code expresses repeated computation using code blocks. There are some things you can do from code blocks that you can’t do from function objects: 
+> As shown in the programs in this item, stream pipelines express repeated computation using function objects (typically lambdas or method references), while iterative code expresses repeated computation using code blocks. There are some things you can do from code blocks that you can’t do from function objects: 
 >
-> - Fromacodeblock,youcanreadormodifyanylocalvariableinscope;froma lambda, you can only read final or effectively final variables [JLS 4.12.4], and you can’t modify any local variables.
+> - From a code block,you can read or modify any local variable in scope;from a lambda, you can only read final or effectively final variables [JLS 4.12.4], and you can’t modify any local variables.
 > - From a code block, you can return from the enclosing method, break or continue an enclosing loop, or throw any checked exception that this method is declared to throw; from a lambda you can do none of these things.
 
+就像前面的代码展示的那样Stream pipeline是通过函数对象（通常使用lambda和方法引用）来表示重复的计算的，而在迭代的代码中使用代码块来表示重复的计算。下面这几件事只能通过代码块完成，不能通过函数对象来完成：
 
+- 在代码块中，你可以读取、修改任何作用域内的本地变量；在在lambda里，你只能读取final或者有效final变量（*自声明后，没有修改过的变量*），并且不能修改任何本地变量。
+- 在代码块中，你可以从外围方法中返回、在外围循环中break或者continue，或者抛出方法中声明要抛出的受检异常。而在lambda中，这些都做不到。
 
+> If a computation is best expressed using these techniques, then it’s probably not a good match for streams. Conversely, streams make it very easy to do some things:
+>
+> - Uniformly transform sequences of elements 
+> - Filter sequences of elements
+> - Combine sequences of elements using a single operation (for example to add them, concatenate them, or compute their minimum)
+> - Accumulate sequences of elements into a collection,perhaps grouping them by some common attribute
+> - Search a sequence of elements for an element satisfying some criterion
+>
+> If a computation is best expressed using these techniques, then it is a good candidate for streams.
 
+如果一个计算必须使用这些技术来表示，那么它就可能不适合stream。反之，stream会让下面这些情况变得很简单：
 
+- 统一转换一系列的元素。
+- 过滤元素序列。
+- 使用单个操作来合并元素序列（比如，求和，连接，或者求最小值）。
+- 将元素序列聚合到集合中，比如，按照一些公共属性进行分组。
+- 在元素序列中寻找满足一些条件的元素。
 
+如果一个计算使用这些技术就能很好的表示，那么它就非常适合用stream。
 
+> One thing that is hard to do with streams is to access corresponding elements from multiple stages of a pipeline simultaneously: once you map a value to some other value, the original value is lost. One workaround is to map each value to a *pair object* containing the original value and the new value, but this is not a satisfying solution, especially if the pair objects are required for multiple stages of a pipeline. The resulting code is messy and verbose, which defeats a primary purpose of streams. When it is applicable, a better workaround is to invert the mapping when you need access to the earlier-stage value.
 
+使用stream很难做到，从pipeline的多个状态中同时获取到对应的元素：一旦你把一个值映射成了另一个值，那个原始的值就丢了。有一种变通的发放就是把每个值都映射成包含原始值和新值的对象对，但是这并不是一个很好的解决方法，尤其是pipeline中有很多状态都需要对象对的时候，得到的代码就会很混乱繁杂，也就违背了stream的目的。当有需要访问较早阶段的值的时候，一个更好的变通方法是把这个映射倒过来。
 
+> For example, let’s write a program to print the first twenty *Mersenne primes*. To refresh your memory, a *Mersenne number* is a number of the form 2^*p* − 1. If *p* is prime, the corresponding Mersenne number *may* be prime; if so, it’s a Mersenne prime. As the initial stream in our pipeline, we want all the prime numbers. Here’s a method to return that (infinite) stream. We assume a static import has been used for easy access to the static members of BigInteger:
 
+举个例子，我们来写一个打印前20个梅森素数的程序。解释一下，梅森数就是一个形式为2^P-1的数，若p是素数，且对应梅森数也是素数，那么我们就称之为梅森素数。在我们的pipeline中的初始化stream中，我们想要所有的素数。下面是返回无限stream的方法，为了让代码简单一些，我们假设BigInteger中的而所有的静态成员都使用了静态导入。
 
+```java
+static Stream<BigInteger> primes() {
+       return Stream.iterate(TWO, BigInteger::nextProbablePrime);
+}
+```
 
+> The name of the method (primes) is a plural noun describing the elements of the stream. This naming convention is highly recommended for all methods that return streams because it enhances the readability of stream pipelines. The method uses the static factory Stream.iterate, which takes two parameters: the first element in the stream, and a function to generate the next element in the stream from the previous one. Here is the program to print the first twenty Mersenne primes:
 
+primes方法的名字是一个复数名词，很好地描述了stream中的元素。推荐所有返回stream的方法都使用这个命名习惯，因为这样会增强stream pipeline的可读性。这个方法使用了静态工厂方法Stream.iterate，这个方法有两个参数，stream中的第一个元素，和用来根据前一个元素生成下一个元素的函数。下面是用来打印前20个梅森素数的程序：
 
+```java
+public static void main(String[] args) {
+       primes().map(p -> TWO.pow(p.intValueExact()).subtract(ONE))
+           .filter(mersenne -> mersenne.isProbablePrime(50))
+           .limit(20)
+           .forEach(System.out::println);
+}
+```
 
+> This program is a straightforward encoding of the prose description above: it starts with the primes, computes the corresponding Mersenne numbers, filters out all but the primes (the magic number 50 controls the probabilistic primality test), limits the resulting stream to twenty elements, and prints them out.
 
+这个程序是对上面的描述的简单的编码实现：它从primes开始，然后计算对应的梅森值，然后过滤出所有的素数（这个神奇的50用来控制概率素性测试），把得到的stream限制在20个元素，然后把它们打印出来。
 
+> Now suppose that we want to precede each Mersenne prime with its exponent (*p*). This value is present only in the initial stream, so it is inaccessible in the terminal operation, which prints the results. Luckily, it’s easy to compute the ex- ponent of a Mersenne number by inverting the mapping that took place in the first intermediate operation. The exponent is simply the number of bits in the binary representation, so this terminal operation generates the desired result:
 
+现在，假设我们还想在每个梅森素数之前打印它对应的指数p。这个值只存在与初始化的stream中，因此在打印结果的终止操作中访问不到。幸运地是，我们可以很容易地计算出梅森素数的指数，只需要将第一步中间操作中的映射计算反过来就好了。这个指数刚好就是他的二进制表示的位数，因此下面这个终止操作就可生成我们想要的结果。
 
+```java
+.forEach(mp -> System.out.println(mp.bitLength() + ": " + mp));
+```
 
+> There are plenty of tasks where it is not obvious whether to use streams or iteration. For example, consider the task of initializing a new deck of cards. Assume that Card is an immutable value class that encapsulates a Rank and a Suit, both of which are enum types. This task is representative of any task that requires computing all the pairs of elements that can be chosen from two sets. Mathematicians call this the *Cartesian product* of the two sets. Here’s an iterative implementation with a nested for-each loop that should look very familiar to you:
 
+还是有很多任务，在使用stream还是迭代方面不是很明显。比如，一个初始化一副牌的任务，假定Card是一个包含枚举Rank和枚举Suit的不可变类。这个任务是一个典型的需要计算从两个集合中选择所有元素对的任务。数学上，称之为两个集合的笛卡尔积。下面是一个你很熟悉的，使用嵌套for-each的迭代实现。代码如下：
+
+```java
+// Iterative Cartesian product computation
+   private static List<Card> newDeck() {
+       List<Card> result = new ArrayList<>();
+       for (Suit suit : Suit.values())
+           for (Rank rank : Rank.values())
+               result.add(new Card(suit, rank));
+       return result;
+   }
+```
+
+> And here is a stream-based implementation that makes use of the intermediate operation flatMap. This operation maps each element in a stream to a stream and then concatenates all of these new streams into a single stream (or *flattens* them). Note that this implementation contains a nested lambda, shown in boldface:
+
+下面是一个基于stream的实现，使用了中间操作flatMap。这个操作将一个stream中的每一个元素都映射到另一个stream中，然后把这些新的stream合并到一个stream中（或者说，扁平化）。需要注意的是，这个实现包含一个嵌套的lambda，如粗体所示：
+
+```java
+// Stream-based Cartesian product computation
+   private static List<Card> newDeck() {
+       return Stream.of(Suit.values())
+         .flatMap(suit ->
+                  Stream.of(Rank.values())
+                  		.map(rank -> new Card(suit, rank))) 
+         .collect(toList());
+   }
+```
+
+> Which of the two versions of newDeck is better? It boils down to personal preference and the environment in which you’re programming. The first version is simpler and perhaps feels more natural. A larger fraction of Java programmers will be able to understand and maintain it, but some programmers will feel more comfortable with the second (stream-based) version. It’s a bit more concise and not too difficult to understand if you’re reasonably well-versed in streams and functional programming. If you’re not sure which version you prefer, the iterative version is probably the safer choice. If you prefer the stream version and you believe that other programmers who will work with the code will share your preference, then you should use it.
+
+这两个版本你的newDeck哪一个更好呢？这就取决于你的个人爱好和编程环境了。第一个版本很简单，看起来也更自然一些，大部分的程序员都能理解和维护它。但是也有一些程序员更喜欢第二个版本，它更加简洁，如果你熟悉stream和函数编程的话，看起来也不难理解。如果你不知道该选择哪个版本，迭代版本大概要更加安全一些。如果你更喜欢stream版本，你也相信后续使用这些代码的程序员也会喜欢这个版本，你就应该使用它。
+
+> In summary, some tasks are best accomplished with streams, and others with iteration. Many tasks are best accomplished by combining the two approaches. There are no hard and fast rules for choosing which approach to use for a task, but there are some useful heuristics. In many cases, it will be clear which approach to use; in some cases, it won’t. **If you’re not sure whether a task is better served by streams or iteration, try both and see which works better.**
+
+总结一下，一些任务最好使用stream完成，而有一些任务最好用迭代完成。很多的任务最好是结合这两种方法来完成。对于一个任务应该选用哪种方法，没有硬性，速成的规则，但是可以参考一些有意义的启发。在大部分情况下，选择哪一种是很清晰的；在一些情况下，就不清晰了。**如果你不能确定这个任务使用stream实现好还是迭代好，你可以都试一下，看看那个工作得好一些。**

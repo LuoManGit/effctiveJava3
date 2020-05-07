@@ -45,30 +45,63 @@ Stream pipeline的终止操作本质上也会影响并行执行的效率。如�
 
 如果你想写一个自己的Stream，Iterable 或者Collection实现，并且你希望并行时性能不错，你就必须覆盖spliterator方法，并且广泛测试得到的stream的并行性能。写一个高质量的spliterator太负责了，不在本书的讨论范围内。
 
-> **Not only can parallelizing a stream lead to poor performance, including liveness failures; it can lead to incorrect results and unpredictable behavior** (*safety failures*). Safety failures may result from parallelizing a pipeline that uses mappers, filters, and other programmer-supplied function objects that fail to adhere to their specifications. The Stream specification places stringent requirements on these function objects. For example, the accumulator and combiner functions passed to Stream’s reduce operation must be associative, non-interfering, and stateless. If you violate these requirements (some of which are discussed in Item 46) but run your pipeline sequentially, it will likely yield correct results; if you paral- lelize it, it will likely fail, perhaps catastrophically.
+> **Not only can parallelizing a stream lead to poor performance, including liveness failures; it can lead to incorrect results and unpredictable behavior** (*safety failures*). Safety failures may result from parallelizing a pipeline that uses mappers, filters, and other programmer-supplied function objects that fail to adhere to their specifications. The Stream specification places stringent requirements on these function objects. For example, the accumulator and combiner functions passed to Stream’s reduce operation must be associative, non-interfering, and stateless. If you violate these requirements (some of which are discussed in Item 46) but run your pipeline sequentially, it will likely yield correct results; if you parallelize it, it will likely fail, perhaps catastrophically.
 
+**对Stream并行化不仅可能导致性能更差，比如活性失败；还肯能会出现不正确的结果和不可预期的行为（即安全性失败）。安全性失败可有是因为并行化的pipeline使用了没有遵守规定的映射器、过滤器、或者是其他的函数对象。stream的规范在这些函数对象上，有严格的规定。比如，传递给reduce操作的收集器和组合器函数，必须是有关联，互不干扰，和无状态的。如果你违背了这些要求(在Item46里面讨论了一些)，但是你串行地执行pipeline的话，可能会得到正确的结果。如果你并行执行的话，它就可能会失败，甚至还是灾难性的。
 
+> Along these lines, it’s worth noting that even if the parallelized Mersenne primes program had run to completion, it would not have printed the primes in the correct (ascending) order. To preserve the order displayed by the sequential version, you’d have to replace the forEach terminal operation with forEachOrdered, which is guaranteed to traverse parallel streams in *encounter order*.
 
+在上面的介绍中，有一点需要注意的是，即使这个并行化的梅森素数程序可以允许结束，它也不会按正确（升序）的顺序打印这些素数。为了要获得和串行允许一样的结果，你必须要把终止操作forEach修改为forEachOrdered。这个方法可以保证按照encounter顺序遍历并行的stream。
 
+> Even assuming that you’re using an efficiently splittable source stream, a parallelizable or cheap terminal operation, and non-interfering function objects, you won’t get a good speedup from parallelization unless the pipeline is doing enough real work to offset the costs associated with parallelism. As a *very* rough estimate, the number of elements in the stream times the number of lines of code executed per element should be at least a hundred thousand [Lea14].
 
+即使你使用的是有效的可分割的stream源，一个可并行化或者简单的终止操作，以及互不干扰的函数对象；除非pipeline做的工作足够地多可以抵消并行相关的消耗，否则你也不能通过并行化获得速度提升。有一个粗略的估计，stream中元素的数量是每个元素执行的代码的行数的至少10万倍的时候 [Lea14].，才可能有速度提升。
 
+> It’s important to remember that parallelizing a stream is strictly a performance optimization. As is the case for any optimization, you must test the performance before and after the change to ensure that it is worth doing (Item 67). Ideally, you should perform the test in a realistic system setting. Normally, all parallel stream pipelines in a program run in a common fork-join pool. A single misbehaving pipeline can harm the performance of others in unrelated parts of the system.
 
+需要切记的是：并行化stream是一项严格的性能优化。只要和优化相关，你都必须先测试其性能，然后在改变后再次测试性能，以确定确实值得优化（Item67）。理想情况下，你应该在实际系统环境下执行测试。通常来说，所有的程序里的并行化stream pipeline都在一个fork-join池里运行。一个行为异常的pipeline，会损害系统中其他不相关模块的性能，
 
+> If it sounds like the odds are stacked against you when parallelizing stream pipelines, it’s because they are. An acquaintance who maintains a multimillion- line codebase that makes heavy use of streams found only a handful of places where parallel streams were effective. This does *not* mean that you should refrain from parallelizing streams. **Under the right circumstances, it** **is** **possible to achieve near-linear speedup in the number of processor cores simply by adding a** **parallel** **call to a stream pipeline.** Certain domains, such as machine learning and data processing, are particularly amenable to these speedups.
 
+听起来好像并行化stream有很多的问题，它也确实是这样的。有一个朋友维护一个大量使用stream的几百万行的代码库，发现其中只有少数几个并行stream是有效的。但是这也并不意味着你应该避免使用并行化stream。**在正确的情景下，只在stream pipeline上简单地添加一个parallel调用，还是有可能将速度提升 处理器个数的倍数。在某些确定的领域，比如及其学习和数据处理上，特别适用这些速度提升。
 
+> As a simple example of a stream pipeline where parallelism is effective, consider this function for computing π(*n*), the number of primes less than or equal to *n*:
 
+举一个简单的stream pipeline的例子，其并行化是有效的。下面这个函数是用来计算π(n)的，表示小于或等于n的素数的数量：
 
+```java
+// Prime-counting stream pipeline - benefits from parallelization
+   static long pi(long n) {
+       return LongStream.rangeClosed(2, n)
+           .mapToObj(BigInteger::valueOf)
+           .filter(i -> i.isProbablePrime(50))
+           .count();
+}
+```
 
+> On my machine, it takes 31 seconds to compute π(10^8) using this function. Simply adding a parallel() call reduces the time to 9.2 seconds:
 
+在作者的机器上，使用这个函数计算π(10^8) 花了31秒。而简单地添加了parallel()以后，花费时间减少到了9.2秒：
 
+```java
+// Prime-counting stream pipeline - parallel version
+   static long pi(long n) {
+       return LongStream.rangeClosed(2, n)
+         .parallel()
+         .mapToObj(BigInteger::valueOf)
+         .filter(i -> i.isProbablePrime(50))
+         .count();
+   }
+```
 
+> In other words, parallelizing the computation speeds it up by a factor of 3.7 on my quad-core machine. It’s worth noting that this is *not* how you’d compute π(*n*) for large values of *n* in practice. There are far more efficient algorithms, notably Lehmer’s formula.
 
+换句话说，在作者的四核机器上，对这个计算的并行化提升了3.7倍的速度。需要注意的是，这并不是实际应用中，计算n很大时的 π(*n*)的方法。有一些更有效的算法，尤其是Lehmer公式。
 
+> If you are going to parallelize a stream of random numbers, start with a SplittableRandom instance rather than a ThreadLocalRandom (or the essentially obsolete Random). SplittableRandom is designed for precisely this use, and has the potential for linear speedup. ThreadLocalRandom is designed for use by a single thread, and will adapt itself to function as a parallel stream source, but won’t be as fast as SplittableRandom. Random synchronizes on every operation, so it will result in excessive, parallelism-killing contention.
 
+如果你想要并行化一个随机数的stream，应该从SplittableRandom实例开始，而不是从ThreadLocalRandom（或者更过时的Random）开始。SplittableRandom是专门为此设计的，可能带来线性的速度提升。ThreadLocalRandom是设计用来单线程中的，它也可能把自己当做一个并行stream源运用到函数中，但是速度没有SplittableRandom快。Random在每次操作上都要进行同步，同步可能被滥用，因此扼杀了并行的优势。
 
+> In summary, do not even attempt to parallelize a stream pipeline unless you have good reason to believe that it will preserve the correctness of the computation and increase its speed. The cost of inappropriately parallelizing a stream can be a program failure or performance disaster. If you believe that parallelism may be justified, ensure that your code remains correct when run in parallel, and do careful performance measurements under realistic conditions. If your code remains correct and these experiments bear out your suspicion of increased performance, then and only then parallelize the stream in production code.
 
-
-
-
-
-​	
+总结一下，除非你有很好的的理由相信并行化stream pipeline会得到正确的结果以及提升速度，否则不要并行化stream pipeline。不合适的并行化stream的袋盖可能是程序错误，或者性能受损。如果你相信并行化是合适的，确定在并行化运行的时候，其他的代码也能保持正确，并且在现实条件下，做仔细的性能测试。如果你的代码是正确的，实验也证明这有助于性能提升，这个时候，也只有这个时候，才可以在编写代码的时候并行化stream。

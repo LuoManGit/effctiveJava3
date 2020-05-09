@@ -82,25 +82,16 @@ private static void sort(long a[], int offset, int length) {
 
 > There are exceptions to the rule that you should explicitly check a method’s parameters before performing its computation. An important exception is the case in which the validity check would be expensive or impractical *and* the check is performed implicitly in the process of doing the computation. For example, consider a method that sorts a list of objects, such as Collections.sort(List). All of the objects in the list must be mutually comparable. In the process of sorting the list, every object in the list will be compared to some other object in the list. If the objects aren’t mutually comparable, one of these comparisons will throw a ClassCastException, which is exactly what the sort method should do. Therefore, there would be little point in checking ahead of time that the elements in the list were mutually comparable. Note, however, that indiscriminate reliance on implicit validity checks can result in the loss of *failure atomicity* (Item 76).
 
+“你应该在执行计算之前，明确地检查方法的参数”这一原则，有一些例外的情况。一个重要的例外情况就是有效性检查的代价非常昂贵或者无法进行，以及在执行计算的过程中隐式地进行了有效性检查。比如，给列表数据进行排序的方法，比如 Collections.sort(List)。这个列表中的所有的对象都必须是可以相互比较的。在进行排序的过程中，每个列表中的对象都需要和列表中的其他对象进行比较。如果有一些对象不可以相互比较，那么这些比较中的某一个就会抛出ClassCastException，这也正是sort方法应该做的。因此，提前检查这些方法是不是可以互相比较的就不是那么重要了。然而，需要注意的是，过度依赖这种隐式的有效性检查可能会失去“失败原子性（Item76）”。
 
+> Occasionally, a computation implicitly performs a required validity check but throws the wrong exception if the check fails. In other words, the exception that the computation would naturally throw as the result of an invalid parameter value doesn’t match the exception that the method is documented to throw. Under these circumstances, you should use the *exception translation* idiom, described in Item 73, to translate the natural exception into the correct one.
 
+有时候，计算时隐式执行的有效性检查，在检查失败的异常可能是错的。换句话说，就是，计算时因为参数异常抛出的异常，可能和文档中声明会抛出的异常不一致。在这种情况下，你可以使用Item73里介绍的异常转换技术，来把这个异常转换成正确的异常。
 
+> Do not infer from this item that arbitrary restrictions on parameters are a good thing. On the contrary, you should design methods to be as general as it is practical to make them. The fewer restrictions that you place on parameters, the better, assuming the method can do something reasonable with all of the parameter values that it accepts. Often, however, some restrictions are intrinsic to the abstraction being implemented.
 
+不要从本节中得出这样的结论：对参数的任何限制都是好事。相反地，你应该把把它设计得竟可能通用，和实际情况相符。假如这个方法能对其接受的所有值都做出正确的工作，那么参数上的限制越少就越好。然后，大部分时候，一些方法上的限制对于这个抽象的实现是固有的。
 
+> To summarize, each time you write a method or constructor, you should think about what restrictions exist on its parameters. You should document these restrictions and enforce them with explicit checks at the beginning of the method body. It is important to get into the habit of doing this. The modest work that it entails will be paid back with interest the first time a validity check fails.
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+总结一下，每次你写方法或者构造器的时候，都应该思考一下参数上应该有的限制。你应该用文档说明这些限制，并且在方法体的开头使用明确的检查来强制执行这些限制。养成这样一个习惯非常重要。只要这个有效性检验有一次失败，你为此付出的工作就是很值得的。

@@ -47,23 +47,41 @@
 
 > The effects of API design on performance are very real. Consider the getSize method in the java.awt.Component class. The decision that this performance- critical method was to return a Dimension instance, coupled with the decision that Dimension instances are mutable, forces any implementation of this method to allocate a new Dimension instance on every invocation. Even though allocating small objects is inexpensive on a modern VM, allocating millions of objects needlessly can do real harm to performance.
 
+API设计对性能的影响是真实存在的。比如java.awt.Component类的getSize方法，这个对性能要求很高的方法返回的是一个Dimension实例，而Dimension实例又是可变的，因此导致这个方法的每个实现，在调用这个方法的时候都需要创建一个新的Dimension实例。即使对于现代虚拟机来说，创建一个小对象的开销并不大，但是创建上百万的无用的对象也还是会造成性能损害的。
 
+> Several API design alternatives existed. Ideally, Dimension should have been immutable (Item 17); alternatively, getSize could have been replaced by two methods returning the individual primitive components of a Dimension object. In fact, two such methods were added to Component in Java 2 for performance reasons. Preexisting client code, however, still uses the getSize method and still suffers the performance consequences of the original API design decisions.
 
+有几个可以替代的API设计方法。最理想的是，Dimension应该是不可变的（Item17）；或者，使用两个分别返回Dimension的私有组件的方法来提到getSize方法。事实上，在Java2中，出于性能考虑，已经在Component中添加了这样的两个方法。然而，那么已经存在的客户端代码，仍然使用getSize方法，也就仍然需要收到原始API设计带来的性能的影响。
 
+> Luckily, it is generally the case that good API design is consistent with good performance. **It is a very bad idea to warp an API to achieve good performance.** The performance issue that caused you to warp the API may go away in a future release of the platform or other underlying software, but the warped API and the support headaches that come with it will be with you forever.
+>
+> Once you’ve carefully designed your program and produced a clear, concise, and well-structured implementation, *then* it may be time to consider optimization, assuming you’re not already satisfied with the performance of the program.
 
+幸运的是，通常来说，好的API就会有好的性能。**为了获得好的性能而扭曲API是非常不可取的**。因为让你扭曲APi的性能问题，可能会随着平台版本或者底层软件的版本升级而消失。但是扭曲的API，以及它带来的让人头疼的问题，会一直伴随着你。
 
+一旦你好好地设计了这个程序，并且生成了一个清晰、简洁、结构良好的实现。然后如果你对程序的性能不满意的话，现在就是你考虑优化的时候了。
 
+> Recall that Jackson’s two rules of optimization were “Don’t do it,” and “(for experts only). Don’t do it yet.” He could have added one more: **measure performance before and after each attempted optimization.** You may be surprised by what you find. Often, attempted optimizations have no measurable effect on performance; sometimes, they make it worse. The main reason is that it’s difficult to guess where your program is spending its time. The part of the program that you think is slow may not be at fault, in which case you’d be wasting your time trying to optimize it. Common wisdom says that programs spend 90 percent of their time in 10 percent of their code.
 
+回顾一下Jackson的两条关于优化的规则：“不要优化” 和“（只针对专家），还是不要优化”。它还可以增加一条：**在每次进行优化的前后，都进行性能测试。**你可能会被得到的结果吓到。通常，试图做的优化并不能给性能带来可测量的影响；有的还是，还会更糟糕。主要的原因是，很难才出程序把它的时间都花在哪里了。你认为程序中比较慢的部分，可能并不慢，而你还浪费了时间去试图优化它。大多数人认为“程序在10%的代码上花了90%的时间”。
 
+> Profiling tools can help you decide where to focus your optimization efforts. These tools give you runtime information, such as roughly how much time each method is consuming and how many times it is invoked. In addition to focusing your tuning efforts, this can alert you to the need for algorithmic changes. If a quadratic (or worse) algorithm lurks inside your program, no amount of tuning will fix the problem. You must replace the algorithm with one that is more efficient. The more code in the system, the more important it is to use a profiler. It’s like looking for a needle in a haystack: the bigger the haystack, the more useful it is to have a metal detector. Another tool that deserves special mention is jmh, which is not a profiler but a *microbenchmarking framework* that provides unparalleled visibility into the detailed performance of Java code [JMH].
 
+性能剖析工具可以很好的帮助你选择优化的重点。这些工具可以给你提供运行时信息，大概就是每个方法执行需要的时间和方法调用的次数。除了确定优化的重点以外，还可以提示你可能有换算法的必要。如果你的程序隐藏着一个平方级别（甚至更糟糕）的算法，进行调整就没什么用了，你必须要使用另外一个高效的算法来替代它。一个系统的代码越多，你就越有必要使用性能剖析攻击。就像是在一个干草堆里找一根针一样：这个干草堆越大，金属探测仪就越有用。另外一个需要特别关注的工具是jmh，它不是一个性能剖析工具，而是一个微基准测试框架，可以给Java代码的性能细节提供无比的可见性。
 
+> The need to measure the effects of attempted optimization is even greater in Java than in more traditional languages such as C and C++, because Java has a weaker *performance model*: The relative cost of the various primitive operations is less well defined. The “abstraction gap” between what the programmer writes and what the CPU executes is greater, which makes it even more difficult to reliably predict the performance consequences of optimizations. There are plenty of performance myths floating around that turn out to be half-truths or outright lies.
 
+对于Java语言，对优化结果进行测量的需求，比其他传统语言比如C和C++，都更有必要，因为Java是弱性能模型：很多基本操作的开销很难定义。程序员编写的代码和CPU执行的代码之间的“语义沟”（*差别*）很大，这使得很难去预测优化对性能的影响。有很多流传的性能说法，最后证明是真假参半、或者就是错误的。
 
+> Not only is Java’s performance model ill-defined, but it varies from implementation to implementation, from release to release, and from processor to processor. If you will be running your program on multiple implementations or multiple hardware platforms, it is important that you measure the effects of your optimization on each. Occasionally you may be forced to make trade-offs between performance on different implementations or hardware platforms.
 
+不仅仅是Java的性能模型没有很好的定义，而且它还会根据不同的实现、不同的版本、不同的处理器而有所不同。如果你的程序需要运行在多个实现或者多个硬件平台上，那么在每个平台上都测试优化的影响就很重要了。有的时候，你必须在不同实现或者硬件平台中做性能权衡。
 
+> In the nearly two decades since this item was first written, every component of the Java software stack has grown in complexity, from processors to VMs to libraries, and the variety of hardware on which Java runs has grown immensely. All of this has combined to make the performance of Java programs even less predictable now than it was in 2001, with a corresponding increase in the need to measure it.
 
+自本节第一次编写已经过去了将近20年了，Java软件栈中的每一个组件，从处理器到虚拟机到类库，都成长得更加复杂了，运行Java的硬件平台也越来越丰富了。所有的这些都使得Java程序的性能比2001年更难预测了，因此对于性能测试的需求也就更重要了。
 
+> To summarize, do not strive to write fast programs—strive to write good ones; speed will follow. But do think about performance while you’re designing systems, especially while you’re designing APIs, wire-level protocols, and persistent data formats. When you’ve finished building the system, measure its performance. If it’s fast enough, you’re done. If not, locate the source of the problem with the aid of a profiler and go to work optimizing the relevant parts of the system. The first step is to examine your choice of algorithms: no amount of low-level optimization can make up for a poor choice of algorithm. Repeat this process as necessary, measuring the performance after every change, until you’re satisfied.
 
-
-
+总结一下，不要致力于写快的程序——应该致力于写好的程序，速度在其次。但是当你在设计系统，尤其是设计API，交互层协议和永久数据格式的时候，一定要考虑到性能。当你完成性能构建的时候，测试一下它的性能。如果已经够快了的话，你的任务就已经完成了。如果还不够的话，使用性能剖析工具来定位问题的源头，然后优化系统中相关的部分。第一步是检查你选择的算法：再多的底层优化，也无法弥补不好的算法选择。有必要的话，重复这个过程，在每次修改后都测试一下性能，直到满意为止。
 

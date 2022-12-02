@@ -62,7 +62,7 @@ public static Boolean valueOf(boolean b) {
 
 这种集合框架的api设计 比为45种实现分别返回公有类的设计 要简洁得多。这种减少不仅仅是数量上减少，也是概念上的减少。程序员为了使用这个api小掌握的概念的数量和复杂度都减少了。且程序员知道返回的对象是由他的接口精确确定的，不需要去阅读具体实现类的参考文档了。除此之外，当调用返回类型为接口类型的静态工厂方法时，要求客户端必须通过接口来引用返回的对象，而不是具体的实现类，这是一个非常好的编程习惯（Item64）。
 
-在Java8里， 去除了接口不能包含静态方法的限制，因此没有理由再为一个接口提供一个不可实例化的伙伴类了。很多应该放在伙伴类里的静态变量，现在都应该放在接口里了。然而，由于Java8 中要求所有的静态成员必须是私有的，因此还是有必要将一部分代码放在一个单独的包私有类的静态方法里。在Java9里允许接口包含私有的静态方法，但是静态域和静态类成员还是必须是公有的。
+在Java8里， 去除了接口不能包含静态方法的限制，因此没有理由再为一个接口提供一个不可实例化的伙伴类了。很多应该放在伙伴类里的静态变量，现在都应该放在接口里了。然而，由于Java8 中要求所有的静态成员必须是公有的，因此还是有必要将一部分代码放在一个单独的包私有类的静态方法里。在Java9里允许接口包含私有的静态方法，但是静态域和静态类成员还是必须是公有的。
 
 >**A fourth advantage of static factories is that the class of the returned object can vary from call to call as a function of the input parameters.** Any subtype of the declared return type is permissible. The class of the returned object can also vary from release to release.
 >
